@@ -34,10 +34,12 @@
 
 #include "core/input/input.h"
 #include "core/os/keyboard.h"
+#include "editor/editor_command_palette.h"
 #include "editor/editor_node.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_string_names.h"
 #include "editor/editor_undo_redo_manager.h"
+#include "editor/gui/editor_bottom_panel.h"
 #include "editor/plugins/node_3d_editor_plugin.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/3d/camera_3d.h"
@@ -1198,11 +1200,6 @@ GridMapEditor::GridMapEditor() {
 	ED_SHORTCUT("grid_map/clear_selection", TTR("Clear Selection"), Key::KEY_DELETE);
 	ED_SHORTCUT("grid_map/fill_selection", TTR("Fill Selection"), KeyModifierMask::CTRL + Key::F);
 
-	int mw = EDITOR_DEF("editors/grid_map/palette_min_width", 230);
-	Control *ec = memnew(Control);
-	ec->set_custom_minimum_size(Size2(mw, 0) * EDSCALE);
-	add_child(ec);
-
 	spatial_editor_hb = memnew(HBoxContainer);
 	spatial_editor_hb->set_h_size_flags(SIZE_EXPAND_FILL);
 	spatial_editor_hb->set_alignment(BoxContainer::ALIGNMENT_END);
@@ -1493,24 +1490,6 @@ GridMapEditor::~GridMapEditor() {
 	}
 }
 
-void GridMapEditorPlugin::_notification(int p_what) {
-	switch (p_what) {
-		case EditorSettings::NOTIFICATION_EDITOR_SETTINGS_CHANGED: {
-			if (!EditorSettings::get_singleton()->check_changed_settings_in_group("editors/grid_map")) {
-				break;
-			}
-			switch ((int)EDITOR_GET("editors/grid_map/editor_side")) {
-				case 0: { // Left.
-					Node3DEditor::get_singleton()->move_control_to_left_panel(grid_map_editor);
-				} break;
-				case 1: { // Right.
-					Node3DEditor::get_singleton()->move_control_to_right_panel(grid_map_editor);
-				} break;
-			}
-		} break;
-	}
-}
-
 void GridMapEditorPlugin::edit(Object *p_object) {
 	grid_map_editor->edit(Object::cast_to<GridMap>(p_object));
 }
@@ -1521,30 +1500,29 @@ bool GridMapEditorPlugin::handles(Object *p_object) const {
 
 void GridMapEditorPlugin::make_visible(bool p_visible) {
 	if (p_visible) {
-		grid_map_editor->show();
+		panel_button->show();
 		grid_map_editor->spatial_editor_hb->show();
+		EditorNode::get_bottom_panel()->make_item_visible(grid_map_editor);
 		grid_map_editor->set_process(true);
 	} else {
+		panel_button->hide();
 		grid_map_editor->spatial_editor_hb->hide();
-		grid_map_editor->hide();
+		if (grid_map_editor->is_visible_in_tree()) {
+			EditorNode::get_bottom_panel()->hide_bottom_panel();
+		}
 		grid_map_editor->set_process(false);
 	}
 }
 
 GridMapEditorPlugin::GridMapEditorPlugin() {
-	EDITOR_DEF("editors/grid_map/editor_side", 1);
-	EditorSettings::get_singleton()->add_property_hint(PropertyInfo(Variant::INT, "editors/grid_map/editor_side", PROPERTY_HINT_ENUM, "Left,Right"));
-
 	grid_map_editor = memnew(GridMapEditor);
-	switch ((int)EDITOR_GET("editors/grid_map/editor_side")) {
-		case 0: { // Left.
-			Node3DEditor::get_singleton()->add_control_to_left_panel(grid_map_editor);
-		} break;
-		case 1: { // Right.
-			Node3DEditor::get_singleton()->add_control_to_right_panel(grid_map_editor);
-		} break;
-	}
+	grid_map_editor->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	grid_map_editor->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	grid_map_editor->set_custom_minimum_size(Size2(0, 200) * EDSCALE);
 	grid_map_editor->hide();
+
+	panel_button = EditorNode::get_bottom_panel()->add_item(TTR("GridMap"), grid_map_editor, ED_SHORTCUT_AND_COMMAND("bottom_panels/toggle_grid_map_bottom_panel", TTR("Toggle GridMap Bottom Panel")));
+	panel_button->hide();
 }
 
 GridMapEditorPlugin::~GridMapEditorPlugin() {

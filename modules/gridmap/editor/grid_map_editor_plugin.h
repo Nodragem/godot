@@ -238,9 +238,7 @@ class GridMapEditorPlugin : public EditorPlugin {
 	GDCLASS(GridMapEditorPlugin, EditorPlugin);
 
 	GridMapEditor *grid_map_editor = nullptr;
-
-protected:
-	void _notification(int p_what);
+	Button *panel_button = nullptr;
 
 public:
 	virtual EditorPlugin::AfterGUIInput forward_3d_gui_input(Camera3D *p_camera, const Ref<InputEvent> &p_event) override { return grid_map_editor->forward_spatial_input_event(p_camera, p_event); }

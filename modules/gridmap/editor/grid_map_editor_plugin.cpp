@@ -42,6 +42,7 @@
 #include "editor/gui/editor_bottom_panel.h"
 #include "editor/plugins/node_3d_editor_plugin.h"
 #include "editor/themes/editor_scale.h"
+#include "editor/gui/editor_zoom_widget.h"
 #include "scene/3d/camera_3d.h"
 #include "scene/gui/dialogs.h"
 #include "scene/gui/label.h"
@@ -833,11 +834,13 @@ void GridMapEditor::_mesh_library_palette_input(const Ref<InputEvent> &p_ie) {
 	// Zoom in/out using Ctrl + mouse wheel
 	if (mb.is_valid() && mb->is_pressed() && mb->is_command_or_control_pressed()) {
 		if (mb->is_pressed() && mb->get_button_index() == MouseButton::WHEEL_UP) {
-			size_slider->set_value(size_slider->get_value() + 0.2);
+			zoom_widget->set_zoom(zoom_widget->get_zoom() + 0.2);
+			zoom_widget->emit_signal(SNAME("zoom_changed"), zoom_widget->get_zoom());
 		}
 
 		if (mb->is_pressed() && mb->get_button_index() == MouseButton::WHEEL_DOWN) {
-			size_slider->set_value(size_slider->get_value() - 0.2);
+			zoom_widget->set_zoom(zoom_widget->get_zoom() - 0.2);
+			zoom_widget->emit_signal(SNAME("zoom_changed"), zoom_widget->get_zoom());
 		}
 	}
 }
@@ -855,7 +858,7 @@ void GridMapEditor::update_palette() {
 	if (display_mode == DISPLAY_THUMBNAIL) {
 		mesh_library_palette->set_max_columns(0);
 		mesh_library_palette->set_icon_mode(ItemList::ICON_MODE_TOP);
-		mesh_library_palette->set_fixed_column_width(min_size * MAX(size_slider->get_value(), 1.5));
+		mesh_library_palette->set_fixed_column_width(min_size * MAX(zoom_widget->get_zoom(), 1.5));
 	} else if (display_mode == DISPLAY_LIST) {
 		mesh_library_palette->set_max_columns(1);
 		mesh_library_palette->set_icon_mode(ItemList::ICON_MODE_LEFT);
@@ -1058,6 +1061,8 @@ void GridMapEditor::_draw_grids(const Vector3 &cell_size) {
 }
 
 void GridMapEditor::_update_theme() {
+	select_tool_button->set_icon(get_theme_icon(SNAME("ToolSelect"), EditorStringName(EditorIcons)));
+	paint_tool_button->set_icon(get_theme_icon(SNAME("Edit"), EditorStringName(EditorIcons)));
 	options->set_icon(get_theme_icon(SNAME("GridMap"), EditorStringName(EditorIcons)));
 	search_box->set_right_icon(get_theme_icon(SNAME("Search"), EditorStringName(EditorIcons)));
 	mode_thumbnail->set_icon(get_theme_icon(SNAME("FileThumbnail"), EditorStringName(EditorIcons)));
@@ -1270,40 +1275,79 @@ GridMapEditor::GridMapEditor() {
 
 	options->get_popup()->connect(SceneStringName(id_pressed), callable_mp(this, &GridMapEditor::_menu_option));
 
-	HBoxContainer *hb = memnew(HBoxContainer);
-	add_child(hb);
-	hb->set_h_size_flags(SIZE_EXPAND_FILL);
+	toolbar = memnew(HBoxContainer);
+	add_child(toolbar);
+	toolbar->set_h_size_flags(SIZE_EXPAND_FILL);
+
+	HBoxContainer *tool_buttons = memnew(HBoxContainer);
+	toolbar->add_child(tool_buttons);
+	tool_buttons_group.instantiate();
+
+	select_tool_button = memnew(Button);
+	select_tool_button->set_theme_type_variation("FlatButton");
+	select_tool_button->set_toggle_mode(true);
+	select_tool_button->set_button_group(tool_buttons_group);
+	//select_tool_button->set_shortcut(ED_SHORTCUT("tiles_editor/selection_tool", TTR("Selection"), Key::S));
+	//select_tool_button->connect(SceneStringName(pressed), callable_mp(this, &TileMapLayerEditorTilesPlugin::_update_toolbar));
+	tool_buttons->add_child(select_tool_button);
+	//viewport_shortcut_buttons.push_back(select_tool_button);
+
+	paint_tool_button = memnew(Button);
+	paint_tool_button->set_theme_type_variation("FlatButton");
+	paint_tool_button->set_toggle_mode(true);
+	paint_tool_button->set_button_group(tool_buttons_group);
+	//paint_tool_button->set_shortcut(ED_GET_SHORTCUT("tiles_editor/paint_tool"));
+	//paint_tool_button->set_tooltip_text(TTR("Shift: Draw line.") + "\n" + keycode_get_string((Key)KeyModifierMask::CMD_OR_CTRL) + TTR("Shift: Draw rectangle."));
+	//paint_tool_button->connect(SceneStringName(pressed), callable_mp(this, &TileMapLayerEditorTilesPlugin::_update_toolbar));
+	tool_buttons->add_child(paint_tool_button);
+	//viewport_shortcut_buttons.push_back(paint_tool_button);
+
+	// Wide empty separation control. (like BoxContainer::add_spacer())
+	Control *c = memnew(Control);
+	c->set_mouse_filter(MOUSE_FILTER_PASS);
+	c->set_h_size_flags(SIZE_EXPAND_FILL);
+	toolbar->add_child(c);
 
 	search_box = memnew(LineEdit);
 	search_box->set_h_size_flags(SIZE_EXPAND_FILL);
 	search_box->set_placeholder(TTR("Filter Meshes"));
 	search_box->set_clear_button_enabled(true);
-	hb->add_child(search_box);
+	toolbar->add_child(search_box);
 	search_box->connect(SceneStringName(text_changed), callable_mp(this, &GridMapEditor::_text_changed));
 	search_box->connect(SceneStringName(gui_input), callable_mp(this, &GridMapEditor::_sbox_input));
+
+	zoom_widget = memnew(EditorZoomWidget);
+	toolbar->add_child(zoom_widget);
+	zoom_widget->setup_zoom_limits(0.2, 4);
+	zoom_widget->set_zoom(1.0);
+	zoom_widget->set_anchors_and_offsets_preset(Control::PRESET_TOP_LEFT, Control::PRESET_MODE_MINSIZE, 2 * EDSCALE);
+	zoom_widget->connect("zoom_changed", callable_mp(this, &GridMapEditor::_icon_size_changed));
+	zoom_widget->set_shortcut_context(this);
+
 
 	mode_thumbnail = memnew(Button);
 	mode_thumbnail->set_theme_type_variation("FlatButton");
 	mode_thumbnail->set_toggle_mode(true);
 	mode_thumbnail->set_pressed(true);
-	hb->add_child(mode_thumbnail);
+	toolbar->add_child(mode_thumbnail);
 	mode_thumbnail->connect(SceneStringName(pressed), callable_mp(this, &GridMapEditor::_set_display_mode).bind(DISPLAY_THUMBNAIL));
 
 	mode_list = memnew(Button);
 	mode_list->set_theme_type_variation("FlatButton");
 	mode_list->set_toggle_mode(true);
 	mode_list->set_pressed(false);
-	hb->add_child(mode_list);
+	toolbar->add_child(mode_list);
 	mode_list->connect(SceneStringName(pressed), callable_mp(this, &GridMapEditor::_set_display_mode).bind(DISPLAY_LIST));
 
-	size_slider = memnew(HSlider);
-	size_slider->set_h_size_flags(SIZE_EXPAND_FILL);
-	size_slider->set_min(0.2f);
-	size_slider->set_max(4.0f);
-	size_slider->set_step(0.1f);
-	size_slider->set_value(1.0f);
-	size_slider->connect(SceneStringName(value_changed), callable_mp(this, &GridMapEditor::_icon_size_changed));
-	add_child(size_slider);
+	// size_slider = memnew(HSlider);
+	// size_slider->set_h_size_flags(SIZE_EXPAND_FILL);
+	// size_slider->set_min(0.2f);
+	// size_slider->set_max(4.0f);
+	// size_slider->set_step(0.1f);
+	// size_slider->set_value(1.0f);
+	// size_slider->connect(SceneStringName(value_changed), callable_mp(this, &GridMapEditor::_icon_size_changed));
+	// add_child(size_slider);
+
 
 	EDITOR_DEF("editors/grid_map/preview_size", 64);
 

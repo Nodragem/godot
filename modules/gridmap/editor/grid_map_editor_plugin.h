@@ -46,6 +46,7 @@ class MenuButton;
 class Node3DEditorPlugin;
 class ButtonGroup;
 class EditorZoomWidget;
+class BaseButton;
 
 class GridMapEditor : public VBoxContainer {
 	GDCLASS(GridMapEditor, VBoxContainer);
@@ -73,10 +74,13 @@ class GridMapEditor : public VBoxContainer {
 	MenuButton *options = nullptr;
 	SpinBox *floor = nullptr;
 	double accumulated_floor_delta = 0.0;
+	
 	HBoxContainer *toolbar = nullptr;
 	Ref<ButtonGroup> tool_buttons_group;
 	Button *select_tool_button = nullptr;
 	Button *paint_tool_button = nullptr;
+	List<BaseButton *> viewport_shortcut_buttons;
+
 	EditorZoomWidget *zoom_widget = nullptr;
 	Button *mode_thumbnail = nullptr;
 	Button *mode_list = nullptr;

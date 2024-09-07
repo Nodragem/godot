@@ -620,8 +620,60 @@ EditorPlugin::AfterGUIInput GridMapEditor::forward_spatial_input_event(Camera3D 
 		return EditorPlugin::AFTER_GUI_INPUT_PASS;
 	}
 
-	Ref<InputEventMouseButton> mb = p_event;
+	Ref<InputEventKey> k = p_event;
+	if (k.is_valid() && k->is_pressed() && !k->is_echo()) {
+		for (BaseButton *b : viewport_shortcut_buttons) {
+			if (b->is_disabled()) {
+				continue;
+			}
 
+			if (b->get_shortcut().is_valid() && b->get_shortcut()->matches_event(p_event)) {
+				if (b->is_toggle_mode()) {
+					b->set_pressed(b->get_button_group().is_valid() || !b->is_pressed());
+				} else {
+					// Can't press a button without toggle mode, so just emit the signal directly.
+					b->emit_signal(SceneStringName(pressed));
+				}
+				return EditorPlugin::AFTER_GUI_INPUT_PASS;
+			}
+		}
+	}
+	
+	if (k.is_valid()) {
+		if (k->is_pressed()) {
+			if (k->get_keycode() == Key::ESCAPE) {
+				if (input_action == INPUT_PASTE) {
+					_clear_clipboard_data();
+					input_action = INPUT_NONE;
+					_update_paste_indicator();
+					return EditorPlugin::AFTER_GUI_INPUT_STOP;
+				} else if (selection.active) {
+					_set_selection(false);
+					return EditorPlugin::AFTER_GUI_INPUT_STOP;
+				} else {
+					selected_palette = -1;
+					mesh_library_palette->deselect_all();
+					update_palette();
+					_update_cursor_instance();
+					return EditorPlugin::AFTER_GUI_INPUT_STOP;
+				}
+			}
+
+			// Consume input to avoid conflicts with other plugins.
+			if (k.is_valid() && k->is_pressed() && !k->is_echo()) {
+				for (int i = 0; i < options->get_popup()->get_item_count(); ++i) {
+					const Ref<Shortcut> &shortcut = options->get_popup()->get_item_shortcut(i);
+					if (shortcut.is_valid() && shortcut->matches_event(p_event)) {
+						accept_event();
+						_menu_option(options->get_popup()->get_item_id(i));
+						return EditorPlugin::AFTER_GUI_INPUT_STOP;
+					}
+				}
+			}
+		}
+	}
+	
+	Ref<InputEventMouseButton> mb = p_event;
 	if (mb.is_valid()) {
 		if (mb->get_button_index() == MouseButton::WHEEL_UP && (mb->is_command_or_control_pressed())) {
 			if (mb->is_pressed()) {
@@ -647,12 +699,12 @@ EditorPlugin::AfterGUIInput GridMapEditor::forward_spatial_input_event(Camera3D 
 					input_action = INPUT_NONE;
 					_update_paste_indicator();
 					return EditorPlugin::AFTER_GUI_INPUT_STOP;
-				} else if (mb->is_shift_pressed() && can_edit) {
+				} else if (tool_buttons_group->get_pressed_button() == select_tool_button && can_edit) {
 					input_action = INPUT_SELECT;
 					last_selection = selection;
 				} else if (mb->is_command_or_control_pressed() && can_edit) {
 					input_action = INPUT_PICK;
-				} else {
+				} else if (tool_buttons_group->get_pressed_button() == paint_tool_button && can_edit) {
 					input_action = INPUT_PAINT;
 					set_items.clear();
 				}
@@ -733,41 +785,6 @@ EditorPlugin::AfterGUIInput GridMapEditor::forward_spatial_input_event(Camera3D 
 		return EditorPlugin::AFTER_GUI_INPUT_PASS;
 	}
 
-	Ref<InputEventKey> k = p_event;
-
-	if (k.is_valid()) {
-		if (k->is_pressed()) {
-			if (k->get_keycode() == Key::ESCAPE) {
-				if (input_action == INPUT_PASTE) {
-					_clear_clipboard_data();
-					input_action = INPUT_NONE;
-					_update_paste_indicator();
-					return EditorPlugin::AFTER_GUI_INPUT_STOP;
-				} else if (selection.active) {
-					_set_selection(false);
-					return EditorPlugin::AFTER_GUI_INPUT_STOP;
-				} else {
-					selected_palette = -1;
-					mesh_library_palette->deselect_all();
-					update_palette();
-					_update_cursor_instance();
-					return EditorPlugin::AFTER_GUI_INPUT_STOP;
-				}
-			}
-
-			// Consume input to avoid conflicts with other plugins.
-			if (k.is_valid() && k->is_pressed() && !k->is_echo()) {
-				for (int i = 0; i < options->get_popup()->get_item_count(); ++i) {
-					const Ref<Shortcut> &shortcut = options->get_popup()->get_item_shortcut(i);
-					if (shortcut.is_valid() && shortcut->matches_event(p_event)) {
-						accept_event();
-						_menu_option(options->get_popup()->get_item_id(i));
-						return EditorPlugin::AFTER_GUI_INPUT_STOP;
-					}
-				}
-			}
-		}
-	}
 
 	Ref<InputEventPanGesture> pan_gesture = p_event;
 	if (pan_gesture.is_valid()) {
@@ -1062,7 +1079,7 @@ void GridMapEditor::_draw_grids(const Vector3 &cell_size) {
 
 void GridMapEditor::_update_theme() {
 	select_tool_button->set_icon(get_theme_icon(SNAME("ToolSelect"), EditorStringName(EditorIcons)));
-	paint_tool_button->set_icon(get_theme_icon(SNAME("Edit"), EditorStringName(EditorIcons)));
+	paint_tool_button->set_icon(get_theme_icon(SNAME("Paint"), EditorStringName(EditorIcons)));
 	options->set_icon(get_theme_icon(SNAME("GridMap"), EditorStringName(EditorIcons)));
 	search_box->set_right_icon(get_theme_icon(SNAME("Search"), EditorStringName(EditorIcons)));
 	mode_thumbnail->set_icon(get_theme_icon(SNAME("FileThumbnail"), EditorStringName(EditorIcons)));
@@ -1287,20 +1304,20 @@ GridMapEditor::GridMapEditor() {
 	select_tool_button->set_theme_type_variation("FlatButton");
 	select_tool_button->set_toggle_mode(true);
 	select_tool_button->set_button_group(tool_buttons_group);
-	//select_tool_button->set_shortcut(ED_SHORTCUT("tiles_editor/selection_tool", TTR("Selection"), Key::S));
-	//select_tool_button->connect(SceneStringName(pressed), callable_mp(this, &TileMapLayerEditorTilesPlugin::_update_toolbar));
+	select_tool_button->set_shortcut(ED_SHORTCUT("new_gridmap/selection_tool", TTR("Selection"), Key::B));
+	//select_tool_button->connect(SceneStringName(pressed), callable_mp(this, &GridmapEditorPlugin::_update_toolbar));
 	tool_buttons->add_child(select_tool_button);
-	//viewport_shortcut_buttons.push_back(select_tool_button);
+	viewport_shortcut_buttons.push_back(select_tool_button);
 
 	paint_tool_button = memnew(Button);
 	paint_tool_button->set_theme_type_variation("FlatButton");
 	paint_tool_button->set_toggle_mode(true);
 	paint_tool_button->set_button_group(tool_buttons_group);
-	//paint_tool_button->set_shortcut(ED_GET_SHORTCUT("tiles_editor/paint_tool"));
+	paint_tool_button->set_shortcut(ED_SHORTCUT("new_gridmap/paint_tool", TTR("Paint"), Key::N));
 	//paint_tool_button->set_tooltip_text(TTR("Shift: Draw line.") + "\n" + keycode_get_string((Key)KeyModifierMask::CMD_OR_CTRL) + TTR("Shift: Draw rectangle."));
-	//paint_tool_button->connect(SceneStringName(pressed), callable_mp(this, &TileMapLayerEditorTilesPlugin::_update_toolbar));
+	//paint_tool_button->connect(SceneStringName(pressed), callable_mp(this, &GridmapEditorPlugin::_update_toolbar));
 	tool_buttons->add_child(paint_tool_button);
-	//viewport_shortcut_buttons.push_back(paint_tool_button);
+	viewport_shortcut_buttons.push_back(paint_tool_button);
 
 	// Wide empty separation control. (like BoxContainer::add_spacer())
 	Control *c = memnew(Control);

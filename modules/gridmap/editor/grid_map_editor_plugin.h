@@ -76,10 +76,19 @@ class GridMapEditor : public VBoxContainer {
 	double accumulated_floor_delta = 0.0;
 	
 	HBoxContainer *toolbar = nullptr;
-	Ref<ButtonGroup> tool_buttons_group;
-	Button *select_tool_button = nullptr;
-	Button *paint_tool_button = nullptr;
 	List<BaseButton *> viewport_shortcut_buttons;
+	Ref<ButtonGroup> mode_buttons_group;
+	// mode
+	Button *select_mode_button = nullptr;
+	Button *erase_mode_button = nullptr;
+	Button *paint_mode_button = nullptr;
+	Button *pick_mode_button = nullptr;
+	// action
+	Button *fill_action_button = nullptr;
+	Button *move_action_button = nullptr;
+	Button *duplicate_action_button = nullptr;
+	// toggle
+	// Button *keep_selected_button = nullptr;
 
 	EditorZoomWidget *zoom_widget = nullptr;
 	Button *mode_thumbnail = nullptr;
@@ -207,6 +216,7 @@ class GridMapEditor : public VBoxContainer {
 	void _item_selected_cbk(int idx);
 	void _update_cursor_transform();
 	void _update_cursor_instance();
+	void _on_tool_mode_changed();
 	void _update_theme();
 
 	void _text_changed(const String &p_text);

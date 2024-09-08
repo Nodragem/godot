@@ -257,10 +257,18 @@ void GridMapEditor::_update_cursor_transform() {
 	cursor_transform.basis *= node->get_cell_scale();
 	cursor_transform = node->get_global_transform() * cursor_transform;
 
-	if (selected_palette >= 0) {
-		if (node && !node->get_mesh_library().is_null()) {
+	if (mode_buttons_group->get_pressed_button() == paint_mode_button) {
+		if (selected_palette >= 0 && node && !node->get_mesh_library().is_null()) {
 			cursor_transform *= node->get_mesh_library()->get_item_mesh_transform(selected_palette);
 		}
+	} 
+	else {
+		Transform3D xf;
+		xf.scale(node->get_cell_size());
+		xf.origin.x = node->get_center_x()? -node->get_cell_size().x/2 : 0;
+		xf.origin.y = node->get_center_y()? -node->get_cell_size().y/2 : 0;
+		xf.origin.z = node->get_center_z()? -node->get_cell_size().z/2 : 0;
+		cursor_transform *= xf;
 	}
 
 	if (cursor_instance.is_valid()) {
@@ -350,13 +358,13 @@ bool GridMapEditor::do_input_action(Camera3D *p_camera, const Point2 &p_point, b
 		return false;
 	}
 
-	if (selected_palette < 0 && input_action != INPUT_PICK && input_action != INPUT_SELECT && input_action != INPUT_PASTE) {
+	if (selected_palette < 0 && input_action != INPUT_NONE && input_action != INPUT_PICK && input_action != INPUT_SELECT && input_action != INPUT_PASTE) {
 		return false;
 	}
 	if (mesh_library.is_null()) {
 		return false;
 	}
-	if (input_action != INPUT_PICK && input_action != INPUT_SELECT && input_action != INPUT_PASTE && !mesh_library->has_item(selected_palette)) {
+	if (input_action != INPUT_NONE && input_action != INPUT_PICK && input_action != INPUT_SELECT && input_action != INPUT_PASTE && !mesh_library->has_item(selected_palette)) {
 		return false;
 	}
 
@@ -407,7 +415,7 @@ bool GridMapEditor::do_input_action(Camera3D *p_camera, const Point2 &p_point, b
 		cursor_origin = (Vector3(cell[0], cell[1], cell[2]) + Vector3(0.5 * node->get_center_x(), 0.5 * node->get_center_y(), 0.5 * node->get_center_z())) * node->get_cell_size();
 		cursor_visible = true;
 
-		if (input_action == INPUT_SELECT || input_action == INPUT_PASTE) {
+		if (input_action == INPUT_PASTE) {
 			cursor_visible = false;
 		}
 
@@ -634,7 +642,7 @@ EditorPlugin::AfterGUIInput GridMapEditor::forward_spatial_input_event(Camera3D 
 					// Can't press a button without toggle mode, so just emit the signal directly.
 					b->emit_signal(SceneStringName(pressed));
 				}
-				return EditorPlugin::AFTER_GUI_INPUT_PASS;
+				return EditorPlugin::AFTER_GUI_INPUT_STOP;
 			}
 		}
 	}
@@ -1171,8 +1179,8 @@ void GridMapEditor::_update_cursor_instance() {
 	}
 	cursor_instance = RID();
 
-	if (selected_palette >= 0 && mode_buttons_group->get_pressed_button() == paint_mode_button) {
-		if (node && !node->get_mesh_library().is_null()) {
+	if (mode_buttons_group->get_pressed_button() == paint_mode_button) {
+		if (selected_palette >= 0 && node && !node->get_mesh_library().is_null()) {
 			Ref<Mesh> mesh = node->get_mesh_library()->get_item_mesh(selected_palette);
 			if (!mesh.is_null() && mesh->get_rid().is_valid()) {
 				cursor_instance = RenderingServer::get_singleton()->instance_create2(mesh->get_rid(), get_tree()->get_root()->get_world_3d()->get_scenario());
@@ -1322,6 +1330,7 @@ GridMapEditor::GridMapEditor() {
 		callable_mp(this, &GridMapEditor::_on_tool_mode_changed));
 	mode_buttons->add_child(select_mode_button);
 	viewport_shortcut_buttons.push_back(select_mode_button);
+	select_mode_button->set_pressed(true);
 
 	erase_mode_button = memnew(Button);
 	erase_mode_button->set_theme_type_variation("FlatButton");

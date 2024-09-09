@@ -1184,14 +1184,13 @@ void GridMapEditor::_update_cursor_instance() {
 			Ref<Mesh> mesh = node->get_mesh_library()->get_item_mesh(selected_palette);
 			if (!mesh.is_null() && mesh->get_rid().is_valid()) {
 				cursor_instance = RenderingServer::get_singleton()->instance_create2(mesh->get_rid(), get_tree()->get_root()->get_world_3d()->get_scenario());
-				RenderingServer::get_singleton()->instance_set_transform(cursor_instance, cursor_transform);
 			}
 		}
 	} 
 	else if (mode_buttons_group->get_pressed_button() == select_mode_button) {
 		cursor_instance = RenderingServer::get_singleton()->instance_create2(selection_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
-		RenderingServer::get_singleton()->instance_set_transform(cursor_instance, cursor_transform);
 	}
+	_update_cursor_transform();
 }
 
 void GridMapEditor::_on_tool_mode_changed(){
@@ -1326,8 +1325,8 @@ GridMapEditor::GridMapEditor() {
 	select_mode_button->set_toggle_mode(true);
 	select_mode_button->set_button_group(mode_buttons_group);
 	select_mode_button->set_shortcut(ED_SHORTCUT("new_gridmap/selection_tool", TTR("Selection"), Key::Q));
-	select_mode_button->connect(SceneStringName(pressed), 
-		callable_mp(this, &GridMapEditor::_on_tool_mode_changed));
+	select_mode_button->connect(SceneStringName(toggled), 
+		callable_mp(this, &GridMapEditor::_on_tool_mode_changed).unbind(1));
 	mode_buttons->add_child(select_mode_button);
 	viewport_shortcut_buttons.push_back(select_mode_button);
 	select_mode_button->set_pressed(true);
@@ -1338,8 +1337,8 @@ GridMapEditor::GridMapEditor() {
 	erase_mode_button->set_button_group(mode_buttons_group);
 	erase_mode_button->set_shortcut(ED_SHORTCUT("new_gridmap/erase_tool", TTR("Erase"), Key::W));
 	mode_buttons->add_child(erase_mode_button);
-	erase_mode_button->connect(SceneStringName(pressed), 
-		callable_mp(this, &GridMapEditor::_on_tool_mode_changed));
+	erase_mode_button->connect(SceneStringName(toggled), 
+		callable_mp(this, &GridMapEditor::_on_tool_mode_changed).unbind(1));
 	viewport_shortcut_buttons.push_back(erase_mode_button);
 
 	paint_mode_button = memnew(Button);
@@ -1347,8 +1346,8 @@ GridMapEditor::GridMapEditor() {
 	paint_mode_button->set_toggle_mode(true);
 	paint_mode_button->set_button_group(mode_buttons_group);
 	paint_mode_button->set_shortcut(ED_SHORTCUT("new_gridmap/paint_tool", TTR("Paint"), Key::E));
-	paint_mode_button->connect(SceneStringName(pressed), 
-		callable_mp(this, &GridMapEditor::_on_tool_mode_changed));
+	paint_mode_button->connect(SceneStringName(toggled), 
+		callable_mp(this, &GridMapEditor::_on_tool_mode_changed).unbind(1));
 	mode_buttons->add_child(paint_mode_button);
 	viewport_shortcut_buttons.push_back(paint_mode_button);
 
@@ -1357,8 +1356,8 @@ GridMapEditor::GridMapEditor() {
 	pick_mode_button->set_toggle_mode(true);
 	pick_mode_button->set_button_group(mode_buttons_group);
 	pick_mode_button->set_shortcut(ED_SHORTCUT("new_gridmap/pick_tool", TTR("Pick"), Key::R));
-	pick_mode_button->connect(SceneStringName(pressed), 
-		callable_mp(this, &GridMapEditor::_on_tool_mode_changed));
+	pick_mode_button->connect(SceneStringName(toggled), 
+		callable_mp(this, &GridMapEditor::_on_tool_mode_changed).unbind(1));
 	mode_buttons->add_child(pick_mode_button);
 	viewport_shortcut_buttons.push_back(pick_mode_button);
 

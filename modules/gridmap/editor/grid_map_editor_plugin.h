@@ -122,6 +122,7 @@ class GridMapEditor : public VBoxContainer {
 
 	RID grid[3];
 	RID grid_instance[3];
+	RID cursor_mesh;
 	RID cursor_instance;
 	RID selection_mesh;
 	RID selection_instance;
@@ -139,7 +140,12 @@ class GridMapEditor : public VBoxContainer {
 
 	List<ClipboardItem> clipboard_items;
 
+	Color default_color;
+	Color erase_color;
+	Color pick_color;
 	Ref<StandardMaterial3D> indicator_mat;
+	Ref<StandardMaterial3D> cursor_inner_mat;
+	Ref<StandardMaterial3D> cursor_outer_mat;
 	Ref<StandardMaterial3D> inner_mat;
 	Ref<StandardMaterial3D> outer_mat;
 	Ref<StandardMaterial3D> selection_floor_mat;

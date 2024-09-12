@@ -1111,6 +1111,8 @@ void GridMapEditor::_notification(int p_what) {
 				RenderingServer::get_singleton()->instance_set_layer_mask(selection_level_instance[i], 1 << Node3DEditorViewport::MISC_TOOL_LAYER);
 			}
 
+			cursor_instance = RenderingServer::get_singleton()->instance_create2(cursor_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
+			RenderingServer::get_singleton()->instance_set_layer_mask(cursor_instance, 1 << Node3DEditorViewport::MISC_TOOL_LAYER);
 			selection_instance = RenderingServer::get_singleton()->instance_create2(selection_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
 			RenderingServer::get_singleton()->instance_set_layer_mask(selection_instance, 1 << Node3DEditorViewport::MISC_TOOL_LAYER);
 			paste_instance = RenderingServer::get_singleton()->instance_create2(paste_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
@@ -1132,8 +1134,10 @@ void GridMapEditor::_notification(int p_what) {
 				RenderingServer::get_singleton()->free(selection_level_instance[i]);
 			}
 
+			RenderingServer::get_singleton()->free(cursor_instance);
 			RenderingServer::get_singleton()->free(selection_instance);
 			RenderingServer::get_singleton()->free(paste_instance);
+			cursor_instance = RID();
 			selection_instance = RID();
 			paste_instance = RID();
 		} break;
@@ -1188,7 +1192,19 @@ void GridMapEditor::_update_cursor_instance() {
 		}
 	} 
 	else if (mode_buttons_group->get_pressed_button() == select_mode_button) {
-		cursor_instance = RenderingServer::get_singleton()->instance_create2(selection_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
+		cursor_inner_mat->set_albedo(Color(default_color, 0.2));
+		cursor_outer_mat->set_albedo(Color(default_color, 0.8));
+		cursor_instance = RenderingServer::get_singleton()->instance_create2(cursor_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
+	}
+	else if (mode_buttons_group->get_pressed_button() == erase_mode_button) {
+		cursor_inner_mat->set_albedo(Color(erase_color, 0.2));
+		cursor_outer_mat->set_albedo(Color(erase_color, 0.8));
+		cursor_instance = RenderingServer::get_singleton()->instance_create2(cursor_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
+	}
+	else if (mode_buttons_group->get_pressed_button() == pick_mode_button) {
+		cursor_inner_mat->set_albedo(Color(pick_color, 0.2));
+		cursor_outer_mat->set_albedo(Color(pick_color, 0.8));
+		cursor_instance = RenderingServer::get_singleton()->instance_create2(cursor_mesh, get_tree()->get_root()->get_world_3d()->get_scenario());
 	}
 	_update_cursor_transform();
 }
@@ -1460,6 +1476,7 @@ GridMapEditor::GridMapEditor() {
 	edit_floor[1] = -1;
 	edit_floor[2] = -1;
 
+	cursor_mesh = RenderingServer::get_singleton()->mesh_create();
 	selection_mesh = RenderingServer::get_singleton()->mesh_create();
 	paste_mesh = RenderingServer::get_singleton()->mesh_create();
 
@@ -1535,20 +1552,32 @@ GridMapEditor::GridMapEditor() {
 		Array d;
 		d.resize(RS::ARRAY_MAX);
 
+		default_color = Color(0.0, 0.565, 1.0); // blue 0.7, 0.7, 1.0
+		erase_color = Color(1.0, 0.2, 0.2); // red
+		pick_color = Color(1, 0.7, 0); // orange/yellow
+
+		cursor_inner_mat.instantiate();
+		cursor_inner_mat->set_albedo(Color(default_color, 0.2));
+		cursor_inner_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+		cursor_inner_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
+		cursor_inner_mat->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
+
+		cursor_outer_mat.instantiate();
+		cursor_outer_mat->set_albedo(Color(default_color, 0.8));
+		cursor_outer_mat->set_on_top_of_alpha();
+		cursor_outer_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+		cursor_outer_mat->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
+		cursor_outer_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
+
 		inner_mat.instantiate();
-		inner_mat->set_albedo(Color(0.7, 0.7, 1.0, 0.2));
+		inner_mat->set_albedo(Color(default_color, 0.2));
 		inner_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
 		inner_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
 		inner_mat->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
 
-		d[RS::ARRAY_VERTEX] = triangles;
-		RenderingServer::get_singleton()->mesh_add_surface_from_arrays(selection_mesh, RS::PRIMITIVE_TRIANGLES, d);
-		RenderingServer::get_singleton()->mesh_surface_set_material(selection_mesh, 0, inner_mat->get_rid());
-
 		outer_mat.instantiate();
-		outer_mat->set_albedo(Color(0.7, 0.7, 1.0, 0.8));
+		outer_mat->set_albedo(Color(default_color, 0.8));
 		outer_mat->set_on_top_of_alpha();
-
 		outer_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
 		outer_mat->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
 		outer_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
@@ -1558,6 +1587,20 @@ GridMapEditor::GridMapEditor() {
 		selection_floor_mat->set_on_top_of_alpha();
 		selection_floor_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
 		selection_floor_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
+
+		d[RS::ARRAY_VERTEX] = triangles;
+		RenderingServer::get_singleton()->mesh_add_surface_from_arrays(cursor_mesh, RS::PRIMITIVE_TRIANGLES, d);
+		RenderingServer::get_singleton()->mesh_surface_set_material(cursor_mesh, 0, cursor_inner_mat->get_rid());
+
+
+		d[RS::ARRAY_VERTEX] = lines;
+		RenderingServer::get_singleton()->mesh_add_surface_from_arrays(cursor_mesh, RS::PRIMITIVE_LINES, d);
+		RenderingServer::get_singleton()->mesh_surface_set_material(cursor_mesh, 1, cursor_outer_mat->get_rid());
+
+		d[RS::ARRAY_VERTEX] = triangles;
+		RenderingServer::get_singleton()->mesh_add_surface_from_arrays(selection_mesh, RS::PRIMITIVE_TRIANGLES, d);
+		RenderingServer::get_singleton()->mesh_surface_set_material(selection_mesh, 0, inner_mat->get_rid());
+
 
 		d[RS::ARRAY_VERTEX] = lines;
 		RenderingServer::get_singleton()->mesh_add_surface_from_arrays(selection_mesh, RS::PRIMITIVE_LINES, d);
@@ -1601,15 +1644,17 @@ GridMapEditor::~GridMapEditor() {
 		if (grid_instance[i].is_valid()) {
 			RenderingServer::get_singleton()->free(grid_instance[i]);
 		}
-		if (cursor_instance.is_valid()) {
-			RenderingServer::get_singleton()->free(cursor_instance);
-		}
 		if (selection_level_instance[i].is_valid()) {
 			RenderingServer::get_singleton()->free(selection_level_instance[i]);
 		}
 		if (selection_level_mesh[i].is_valid()) {
 			RenderingServer::get_singleton()->free(selection_level_mesh[i]);
 		}
+	}
+
+	RenderingServer::get_singleton()->free(cursor_mesh);
+	if (cursor_instance.is_valid()) {
+		RenderingServer::get_singleton()->free(cursor_instance);
 	}
 
 	RenderingServer::get_singleton()->free(selection_mesh);

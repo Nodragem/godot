@@ -87,6 +87,7 @@ class GridMapEditor : public VBoxContainer {
 	Button *fill_action_button = nullptr;
 	Button *move_action_button = nullptr;
 	Button *duplicate_action_button = nullptr;
+	Button *delete_action_button = nullptr;
 	// rotation
 	Button *rotate_x_button = nullptr;
 	Button *rotate_y_button = nullptr;

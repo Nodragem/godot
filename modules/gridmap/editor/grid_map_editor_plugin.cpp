@@ -1105,6 +1105,7 @@ void GridMapEditor::_update_theme() {
 	fill_action_button->set_icon(get_theme_icon(SNAME("Bucket"), EditorStringName(EditorIcons)));
 	move_action_button->set_icon(get_theme_icon(SNAME("ActionCut"), EditorStringName(EditorIcons)));
 	duplicate_action_button->set_icon(get_theme_icon(SNAME("ActionCopy"), EditorStringName(EditorIcons)));
+	delete_action_button->set_icon(get_theme_icon(SNAME("Clear"), EditorStringName(EditorIcons)));
 	rotate_x_button->set_icon(get_theme_icon(SNAME("RotateLeft"), EditorStringName(EditorIcons)));
 	rotate_y_button->set_icon(get_theme_icon(SNAME("ToolRotate"), EditorStringName(EditorIcons)));
 	rotate_z_button->set_icon(get_theme_icon(SNAME("RotateRight"), EditorStringName(EditorIcons)));
@@ -1357,7 +1358,7 @@ GridMapEditor::GridMapEditor() {
 
 	fill_action_button = memnew(Button);
 	fill_action_button->set_theme_type_variation("FlatButton");
-	fill_action_button->set_shortcut(ED_SHORTCUT("grid_map/fill_tool", TTR("Fill"), Key::F, true));
+	fill_action_button->set_shortcut(ED_SHORTCUT("grid_map/fill_tool", TTR("Fill"), Key::Z, true));
 	fill_action_button->connect(SceneStringName(pressed), 
 		callable_mp(this, &GridMapEditor::_menu_option).bind(MENU_OPTION_SELECTION_FILL));
 	action_buttons->add_child(fill_action_button);
@@ -1378,6 +1379,13 @@ GridMapEditor::GridMapEditor() {
 		callable_mp(this, &GridMapEditor::_menu_option).bind(MENU_OPTION_SELECTION_DUPLICATE));
 	action_buttons->add_child(duplicate_action_button);
 	// viewport_shortcut_buttons.push_back(duplicate_action_button);
+
+	delete_action_button = memnew(Button);
+	delete_action_button->set_theme_type_variation("FlatButton");
+	delete_action_button->set_shortcut(ED_SHORTCUT("grid_map/delete_tool", TTR("Delete"), Key::V, true));
+	delete_action_button->connect(SceneStringName(pressed), 
+		callable_mp(this, &GridMapEditor::_menu_option).bind(MENU_OPTION_SELECTION_CLEAR));
+	action_buttons->add_child(delete_action_button);
 
 	vsep = memnew(VSeparator);
 	toolbar->add_child(vsep);
